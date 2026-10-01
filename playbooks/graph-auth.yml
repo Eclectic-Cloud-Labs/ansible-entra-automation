@@ -1,0 +1,30 @@
+---
+- name: Authenticate to Microsoft Graph and list app registrations
+  hosts: local
+  gather_facts: false
+
+  tasks:
+    - name: Request an access token from Microsoft identity platform
+      ansible.builtin.uri:
+        url: "https://login.microsoftonline.com/{{ tenant_id }}/oauth2/v2.0/token"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          client_id: "{{ client_id }}"
+          client_secret: "{{ client_secret }}"
+          scope: "https://graph.microsoft.com/.default"
+          grant_type: "client_credentials"
+      register: token_response
+      no_log: true
+
+    - name: List existing app registrations
+      ansible.builtin.uri:
+        url: "https://graph.microsoft.com/v1.0/applications"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ token_response.json.access_token }}"
+      register: apps_response
+
+    - name: Show how many app registrations exist
+      ansible.builtin.debug:
+        msg: "Found {{ apps_response.json.value | length }} app registration(s) in the tenant"

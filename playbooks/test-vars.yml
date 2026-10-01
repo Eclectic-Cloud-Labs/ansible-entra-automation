@@ -1,0 +1,8 @@
+---
+- name: Test variable loading
+  hosts: local
+  gather_facts: false
+  tasks:
+    - name: Print client_id
+      ansible.builtin.debug:
+        var: client_id
