@@ -1,0 +1,6 @@
+# Non secrets
+tenant_id: "87e450d8-9ee3-4538-a4b3-3cb61e605824"
+client_id: "816ff4a3-965d-4a16-8d6a-18f7d64d3f06"
+
+# Secret is pulled from the encrypted vault.yml 
+client_secret: "{{ vault_client_secret }}"
