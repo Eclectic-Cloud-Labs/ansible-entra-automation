@@ -1,0 +1,51 @@
+---
+- name: Create an Entra app registration idempotently
+  hosts: local
+  gather_facts: false
+  vars:
+    app_display_name: "ansible-demo-app-2"
+
+  tasks:
+    - name: Get an access token
+      ansible.builtin.uri:
+        url: "https://login.microsoftonline.com/{{ tenant_id }}/oauth2/v2.0/token"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          client_id: "{{ client_id }}"
+          client_secret: "{{ client_secret }}"
+          scope: "https://graph.microsoft.com/.default"
+          grant_type: "client_credentials"
+      register: token_response
+      no_log: true
+
+    - name: Check if an app with this name already exists
+      ansible.builtin.uri:
+        url: "https://graph.microsoft.com/v1.0/applications?$filter=displayName%20eq%20'{{ app_display_name }}'"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ token_response.json.access_token }}"
+      register: existing_apps
+
+    - name: Create app registration if existing_apps returns nothing
+      ansible.builtin.uri:
+        url: "https://graph.microsoft.com/v1.0/applications"
+        method: POST
+        body_format: json
+        headers:
+          Authorization: "Bearer {{ token_response.json.access_token }}"
+          Content-Type: application/json
+        body:
+          displayName: "{{ app_display_name  }}"
+        status_code: 201
+      register: created_app
+      when: existing_apps.json.value | length == 0
+
+    - name: Report result
+      ansible.builtin.debug:
+        msg: >-
+          {% if existing_apps.json.value | length > 0 %}
+          App '{{ app_display_name }}' already exists with appId {{ existing_apps.json.value[0].appId }}
+          {% else %}
+          Created app '{{ app_display_name }}' with appId {{ created_app.json.appId }}
+          {% endif %}
