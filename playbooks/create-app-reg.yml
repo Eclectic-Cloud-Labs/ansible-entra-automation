@@ -3,7 +3,7 @@
   hosts: local
   gather_facts: false
   vars:
-    app_display_name: "ansible-demo-app-2"
+    app_display_name: "ansible-demo-app-3"
 
   tasks:
     - name: Get an access token
@@ -39,6 +39,47 @@
           displayName: "{{ app_display_name  }}"
         status_code: 201
       register: created_app
+      when: existing_apps.json.value | length == 0
+
+    - name: Check if spn exists
+      ansible.builtin.uri:
+        url: "https://graph.microsoft.com/v1.0/servicePrincipals?$filter=appId%20eq%20{% if existing_apps.json.value | length > 0%}'{{ existing_apps.json.value[0].appId}}'{% else %}'{{ created_app.json.appId }}'{% endif %}"
+        method: GET
+        body_format: json
+        headers:
+          Authorization: "Bearer {{ token_response.json.access_token }}"
+      register: existing_spn
+
+    - name: Create SPN if existing_spn returns nothing
+      ansible.builtin.uri:
+        url: "https://graph.microsoft.com/v1.0/servicePrincipals"
+        method: POST
+        body_format: json
+        headers:
+          Authorization: "Bearer {{ token_response.json.access_token }}"
+          Content-Type: application/json
+        body:
+          appId: "{% if existing_apps.json.value | length > 0%}{{ existing_apps.json.value[0].appId}}{% else %}{{ created_app.json.appId }}{% endif %}"
+        status_code: 201
+      register: created_spn
+      when: existing_spn.json.value | length == 0
+      retries: 12
+      delay: 5
+      until: created_spn is succeeded
+
+    - name: Create secret password for App Registration
+      ansible.builtin.uri:
+        url: "https://graph.microsoft.com/v1.0/applications/{% if existing_apps.json.value | length > 0 %}{{ existing_apps.json.value[0].id }}{% else %}{{ created_app.json.id }}{% endif %}/addPassword"
+        method: POST
+        body_format: json
+        headers:
+          Authorization: "Bearer {{ token_response.json.access_token }}"
+          Content-Type: application/json
+        body:
+          passwordCredential:
+            displayName: "{{ app_display_name }}-secret"
+        msg: "Secret for {{ app_display_name }}: {{ new_secret.json.secretText }}"
+      register: new_secret
       when: existing_apps.json.value | length == 0
 
     - name: Report result
