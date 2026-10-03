@@ -3,7 +3,7 @@
   hosts: local
   gather_facts: false
   vars:
-    app_display_name: "ansible-demo-app-5"
+    app_display_name: "ansible-demo-app"
 
   tasks:
     - name: Get an access token
@@ -80,6 +80,9 @@
             displayName: "{{ app_display_name }}-secret"
       register: new_secret
       when: existing_apps.json.value | length == 0
+      retries: 12
+      delay: 5
+      until: new_secret is succeeded
 
     - name: Report result
       ansible.builtin.debug:
